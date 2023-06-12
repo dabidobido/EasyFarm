@@ -20,6 +20,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using MahApps.Metro.Controls.Dialogs;
@@ -34,28 +35,52 @@ namespace EasyFarm.Classes
         private const string LibraryPath = "http://ext.elitemmonetwork.com/downloads/eliteapi/EliteAPI.dll";
         private const string LibraryPage = "http://ext.elitemmonetwork.com/downloads/eliteapi/";
 
+        private static string m_filePath = Path.Combine(Environment.CurrentDirectory, "EliteAPI.dll");
+        private static FileVersionInfo m_fileInfo = GetFileInfo(m_filePath);
+        private bool m_gotNewVersion = false;
+
+        public async void CheckNewVersion()
+        {
+            var webclient = new HttpClient();
+            webclient.Timeout = TimeSpan.FromSeconds(5);
+            try
+            {
+                var request = await webclient.GetStringAsync(new Uri(LibraryPage));
+                if (!string.IsNullOrEmpty(request))
+                {
+                    var document = new HtmlDocument();
+                    document.LoadHtml(request);
+                    var download = document.DocumentNode
+                        .SelectNodes("//a[@id=\"download\"]")
+                        .FirstOrDefault();
+                    if (download != null)
+                    {
+                        var versionMatches = Regex.Match(download.InnerText, "v([\\d\\.]+)");
+                        if (versionMatches.Success)
+                        {
+                            m_gotNewVersion = m_fileInfo == null || versionMatches.Groups[1].Value != m_fileInfo.FileVersion;
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                ViewModels.LogViewModel.Write("Failed to get new version: " + e.Message);
+            }   
+        }
         public bool HasUpdate()
         {
-            var filePath = Path.Combine(Environment.CurrentDirectory, "EliteAPI.dll");
-            FileVersionInfo fileInfo = GetFileInfo(filePath);
-
-            string latestVersion = GetLatestVersion();
-            if (string.IsNullOrEmpty(latestVersion)) return false;
-
-            return fileInfo == null || latestVersion != fileInfo.FileVersion;
+            return m_gotNewVersion;
         }
 
         public void Update()
         {
             try
             {
-                var filePath = Path.Combine(Environment.CurrentDirectory, "EliteAPI.dll");
-                FileVersionInfo fileInfo = GetFileInfo(filePath);               
-
                 if (HasUpdate())
                 {
-                    BackupLibrary(fileInfo);
-                    DownloadLibrary(filePath);
+                    BackupLibrary(m_fileInfo);
+                    DownloadLibrary(m_filePath);
                 }
             }
             catch (Exception ex)
@@ -95,25 +120,6 @@ namespace EasyFarm.Classes
             {
                 File.Move(fileVersionInfo.FileName, backupFilePath);
             }
-        }
-
-        private static string GetLatestVersion()
-        {
-            var response = new WebClient().DownloadString(new Uri(LibraryPage));
-
-            var document = new HtmlDocument();
-            document.LoadHtml(response);
-
-            var download = document.DocumentNode
-                .SelectNodes("//a[@id=\"download\"]")
-                .FirstOrDefault();
-            if (download == null) return null;
-
-            var versionMatches = Regex.Match(download.InnerText, "v([\\d\\.]+)");
-            if (!versionMatches.Success) return null;
-
-            var latestVersion = versionMatches.Groups[1].Value;
-            return latestVersion;
         }
 
         private static void DownloadLibrary(string filePath)

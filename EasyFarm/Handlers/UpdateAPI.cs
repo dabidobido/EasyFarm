@@ -39,6 +39,7 @@ namespace EasyFarm.Handlers
 
         protected override async Task Execute()
         {
+            _updater.CheckNewVersion();
             if (_updater.HasUpdate())
             {
                 var showDialogResult = await _dialogCoordinator.ShowMessageAsync(

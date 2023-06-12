@@ -563,7 +563,8 @@ namespace MemoryAPI
         Astral_Conduit = 504,
         Unbridled_Wisdom = 505,
         Three_To_One = 506,
-        Grand_Pas = 507
+        Grand_Pas = 507,
+        Finishing_Move6 = 588,
 
     } // @ public enum StatusEffect : short
 
